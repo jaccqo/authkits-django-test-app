@@ -3,3 +3,6 @@ db.sqlite3
 .env
 *.whl
 dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
