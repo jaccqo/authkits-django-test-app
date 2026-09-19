@@ -1,8 +1,14 @@
 .venv/
 db.sqlite3
+
 .env
+.env.*
+!.env.example
+
 *.whl
 dist/
+build/
+
 __pycache__/
 *.py[cod]
 .pytest_cache/

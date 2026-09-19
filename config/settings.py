@@ -1,8 +1,8 @@
-"""
-Django settings for the public Authkits Django example application.
+"""Django settings for the public Authkits Django reference application.
 
-This project intentionally stays close to a normal host Django project so that
-Authkits integration examples reflect the customer experience.
+The project intentionally behaves like a normal customer-owned host application.
+Authkits owns authentication/security behavior; this project owns deployment,
+environment loading, email, database, middleware and Django configuration.
 """
 
 import os
@@ -11,19 +11,34 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 load_dotenv(BASE_DIR / ".env")
 
 
-# Development-only fallback. Production deployments must provide DJANGO_SECRET_KEY.
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-authkits-reference-app-development-only",
-)
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+def env_list(name, default=()):
+    raw = os.environ.get(name)
+    if raw is None:
+        return tuple(default)
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
+DEBUG = env_bool("DJANGO_DEBUG", True)
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "").strip()
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-authkits-reference-app-development-only"
+    else:
+        raise RuntimeError("DJANGO_SECRET_KEY is required when DJANGO_DEBUG is disabled.")
+
+ALLOWED_HOSTS = list(env_list("DJANGO_ALLOWED_HOSTS", ("127.0.0.1", "localhost")))
+CSRF_TRUSTED_ORIGINS = list(env_list("DJANGO_CSRF_TRUSTED_ORIGINS"))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -95,24 +110,47 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Keep email local and visible while exercising verification/recovery examples.
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = os.environ.get(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DJANGO_DEFAULT_FROM_EMAIL",
+    "Authkits Example <authkits@localhost>",
+)
 
+_totp_keys = env_list("AUTHKITS_TOTP_KEYS")
+_allowed_mfa_methods = env_list("AUTHKITS_MFA_ALLOWED_METHODS", ("totp", "email"))
 
-
-# Host-supplied configuration; never commit real keys.
-_totp_keys = tuple(filter(None, os.environ.get("AUTHKITS_TOTP_KEYS", "").split(",")))
 AUTHKITS = {
-    "ACCOUNTS": {"REQUIRE_EMAIL_VERIFICATION": True},
-    "UI": {"LOGIN_REDIRECT": "/auth/security/"},
+    "ACCOUNTS": {
+        "REQUIRE_EMAIL_VERIFICATION": env_bool(
+            "AUTHKITS_REQUIRE_EMAIL_VERIFICATION",
+            True,
+        ),
+    },
+    "UI": {
+        "LOGIN_REDIRECT": os.environ.get(
+            "AUTHKITS_LOGIN_REDIRECT",
+            "/auth/security/",
+        ),
+    },
+    "EMAIL": {
+        "BASE_URL": os.environ.get("AUTHKITS_EMAIL_BASE_URL", "").strip(),
+    },
     "SECURITY": {
-        "SESSION_TRACKING": True,
-        "TRUSTED_DEVICES": os.environ.get("AUTHKITS_TRUSTED_DEVICES", "0") == "1",
-        "DEVICE_TTL": 2592000,
+        "SESSION_TRACKING": env_bool("AUTHKITS_SESSION_TRACKING", True),
+        "TRUSTED_DEVICES": env_bool("AUTHKITS_TRUSTED_DEVICES", False),
+        "DEVICE_TTL": int(os.environ.get("AUTHKITS_DEVICE_TTL", "2592000")),
     },
     "MFA": {
+        "ENFORCED": env_bool("AUTHKITS_MFA_ENFORCED", False),
+        "ALLOWED_METHODS": _allowed_mfa_methods,
         "TOTP_ENABLED": bool(_totp_keys),
-        "TOTP_ISSUER": "Authkits Example",
+        "TOTP_ISSUER": os.environ.get(
+            "AUTHKITS_TOTP_ISSUER",
+            "Authkits Example",
+        ),
         "ENCRYPTION_KEYS": _totp_keys,
     },
 }
