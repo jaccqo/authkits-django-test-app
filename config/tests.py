@@ -22,7 +22,11 @@ class AccountSecurityIntegration(TestCase):
     def post(self, name, data):
         data = {**data, "csrfmiddlewaretoken": self.client.cookies["csrftoken"].value}
         with self.captureOnCommitCallbacks(execute=True):
-            return self.client.post(reverse("authkits:" + name), data)
+            return self.client.post(
+                reverse("authkits:" + name),
+                data,
+                HTTP_ORIGIN="http://testserver",
+            )
 
     def code(self):
         fields = dict(
@@ -45,7 +49,8 @@ class AccountSecurityIntegration(TestCase):
 
     def test_signup_mfa_and_session_integration(self):
         self.client = Client(enforce_csrf_checks=True)
-        self.client.get(reverse("authkits:signup"))
+        signup_page = self.client.get(reverse("authkits:signup"))
+        self.assertEqual(signup_page["Referrer-Policy"], "same-origin")
         password = "Reference-Uncommon-Password-632!"
         result = self.post(
             "signup",
