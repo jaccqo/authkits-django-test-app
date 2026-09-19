@@ -19,15 +19,19 @@ The paid Authkits package source does **not** live in this repository.
 
 ## Local setup
 
-Create and activate a virtual environment, then install a licensed Authkits wheel containing the completed MFA/security flows (package checkpoint 11 or later).
+Create and activate a virtual environment, install the host-app dependency, then install a licensed Authkits wheel containing the completed MFA/security flows (package checkpoint 11 or later). Copy `.env.example` to `.env` for local configuration; the real `.env` is gitignored.
 
 ```bash
 python -m venv .venv
 python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+cp .env.example .env
 python -m pip install /path/to/authkits_django-<version>-py3-none-any.whl
 python manage.py migrate
 python manage.py runserver
 ```
+
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
 
 Then open `http://localhost:8000/`.
 
