@@ -36,6 +36,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "authkits.security.middleware.SessionSecurityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -91,3 +92,22 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Keep email local and visible while exercising verification/recovery examples.
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+
+
+# Host-supplied configuration; never commit real keys.
+_totp_keys = tuple(filter(None, os.environ.get("AUTHKITS_TOTP_KEYS", "").split(",")))
+AUTHKITS = {
+    "ACCOUNTS": {"REQUIRE_EMAIL_VERIFICATION": True},
+    "UI": {"LOGIN_REDIRECT": "/auth/security/"},
+    "SECURITY": {
+        "SESSION_TRACKING": True,
+        "TRUSTED_DEVICES": os.environ.get("AUTHKITS_TRUSTED_DEVICES", "0") == "1",
+        "DEVICE_TTL": 2592000,
+    },
+    "MFA": {
+        "TOTP_ENABLED": bool(_totp_keys),
+        "TOTP_ISSUER": "Authkits Example",
+        "ENCRYPTION_KEYS": _totp_keys,
+    },
+}

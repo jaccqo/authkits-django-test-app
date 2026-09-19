@@ -46,7 +46,15 @@
         </p>
 
         <div class="hero-actions">
-          <a class="button button-primary" href="#examples-title">Browse examples</a>
+          {% if user.is_authenticated %}
+          <a class="button button-primary" href="{% url 'authkits:security_center' %}">Account security</a>
+          <form method="post" action="{% url 'authkits:logout' %}">{% csrf_token %}
+            <button class="button button-outline" type="submit">Sign out</button>
+          </form>
+          {% else %}
+          <a class="button button-primary" href="{% url 'authkits:signup' %}">Create an account</a>
+          <a class="button button-outline" href="{% url 'authkits:login' %}">Sign in</a>
+          {% endif %}
           <a
             class="button button-outline"
             href="https://github.com/jaccqo/authkits-django-test-app"
@@ -80,38 +88,28 @@ urlpatterns = [
             <h2 id="examples-title">A living reference app.</h2>
           </div>
           <p>
-            As Authkits grows, this project will hold focused examples without bloating the
-            package itself.
+            Try the packaged account and security flows in this ordinary Django host.
           </p>
         </div>
 
         <div class="card-grid">
-          <article class="feature-card">
+          <a class="feature-card" href="{% url 'authkits:login' %}">
             <div class="feature-icon" aria-hidden="true">↳</div>
-            <div>
-              <h3>Authentication flows</h3>
-              <p>Signup, login, logout, verification, recovery, and MFA flows as they land.</p>
-            </div>
-            <span class="badge badge-muted">Next</span>
-          </article>
+            <div><h3>Authentication flows</h3><p>Signup, email verification, sign-in and one-time password recovery.</p></div>
+            <span class="badge badge-muted">Try it</span>
+          </a>
 
-          <article class="feature-card">
+          <a class="feature-card" href="{% url 'authkits:mfa_management' %}">
             <div class="feature-icon" aria-hidden="true">◇</div>
-            <div>
-              <h3>Host customization</h3>
-              <p>Template overrides, CSS variables, email backends, settings, and adapter examples.</p>
-            </div>
-            <span class="badge badge-muted">Soon</span>
-          </article>
+            <div><h3>MFA and recovery</h3><p>Enroll email codes or an authenticator, choose a method and save recovery codes.</p></div>
+            <span class="badge badge-muted">Try it</span>
+          </a>
 
-          <article class="feature-card">
+          <a class="feature-card" href="{% url 'authkits:security_center' %}">
             <div class="feature-icon" aria-hidden="true">{ }</div>
-            <div>
-              <h3>Integration patterns</h3>
-              <p>Examples for allauth, APIs, custom user models, and production-oriented setups.</p>
-            </div>
-            <span class="badge badge-muted">Soon</span>
-          </article>
+            <div><h3>Account security</h3><p>Review sessions, revoke access and manage optional trusted devices.</p></div>
+            <span class="badge badge-muted">Try it</span>
+          </a>
         </div>
       </section>
 
@@ -156,3 +154,4 @@ urlpatterns = [
   <div class="toast" role="status" aria-live="polite" data-toast></div>
 </body>
 </html>
+
