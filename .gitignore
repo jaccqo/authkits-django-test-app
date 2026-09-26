@@ -8,6 +8,7 @@ db.sqlite3
 *.whl
 dist/
 build/
+.authkits/
 
 __pycache__/
 *.py[cod]
