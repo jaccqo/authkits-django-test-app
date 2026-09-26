@@ -153,4 +153,21 @@ AUTHKITS = {
         ),
         "ENCRYPTION_KEYS": _totp_keys,
     },
+    "LICENSING": {
+        "LICENSE_KEY": os.environ.get("AUTHKITS_LICENSE_KEY", "").strip(),
+        "ENTITLEMENT_FILE": os.environ.get(
+            "AUTHKITS_ENTITLEMENT_FILE",
+            ".authkits/entitlement.jws",
+        ).strip(),
+        "ACTIVATION_URL": os.environ.get(
+            "AUTHKITS_ACTIVATION_URL",
+            "https://authkits.com/api/v1/licenses/activate",
+        ).strip(),
+        "CONNECT_TIMEOUT": int(
+            os.environ.get("AUTHKITS_ACTIVATION_CONNECT_TIMEOUT", "5")
+        ),
+        "READ_TIMEOUT": int(
+            os.environ.get("AUTHKITS_ACTIVATION_READ_TIMEOUT", "10")
+        ),
+    },
 }

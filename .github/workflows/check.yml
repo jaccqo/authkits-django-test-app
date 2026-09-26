@@ -24,7 +24,7 @@ jobs:
       - name: Validate example environment and settings import
         run: |
           cp .env.example .env
-          python -c "import config.settings as s; assert s.DEBUG is True; assert '127.0.0.1' in s.ALLOWED_HOSTS"
+          python -c "import config.settings as s; assert s.DEBUG is True; assert '127.0.0.1' in s.ALLOWED_HOSTS; licensing=s.AUTHKITS['LICENSING']; assert licensing['LICENSE_KEY'] == ''; assert licensing['ENTITLEMENT_FILE'] == '.authkits/entitlement.jws'; assert licensing['ACTIVATION_URL'] == 'https://authkits.com/api/v1/licenses/activate'"
 
       - name: Check Python syntax
         run: python -m compileall -q config manage.py
