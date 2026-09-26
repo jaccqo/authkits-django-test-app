@@ -22,6 +22,7 @@ The paid Authkits package source and wheel are never committed here.
 - session inventory and revocation
 - trusted-device configuration hooks
 - host-owned environment and Django configuration
+- licensed activation with a signed offline entitlement
 
 Social/django-allauth examples will be added when the provider-flow checkpoints ship.
 Headless/DRF examples remain a later phase.
@@ -146,11 +147,48 @@ AUTHKITS_SESSION_TRACKING=1
 AUTHKITS_MFA_ENFORCED=0
 AUTHKITS_MFA_ALLOWED_METHODS=totp,email
 AUTHKITS_TOTP_KEYS=
+AUTHKITS_LICENSE_KEY=
+AUTHKITS_ENTITLEMENT_FILE=.authkits/entitlement.jws
 AUTHKITS_TRUSTED_DEVICES=0
 ```
 
 `AUTHKITS_TOTP_KEYS` may contain multiple comma-separated Fernet keys during key
 rotation, newest first.
+
+## Licensed activation smoke
+
+The current Authkits Django wheel ships the production entitlement verification key,
+so this reference app can exercise the real customer activation path without storing
+private package or signing material in Git.
+
+Put a real Django Authentication license in the untracked `.env`:
+
+```env
+AUTHKITS_LICENSE_KEY=AK_PRO_...
+AUTHKITS_ENTITLEMENT_FILE=.authkits/entitlement.jws
+```
+
+Then activate explicitly:
+
+```powershell
+python manage.py authkits_activate
+```
+
+A successful activation verifies the signed entitlement locally before atomically
+writing `.authkits/entitlement.jws`. That directory is gitignored.
+
+After activation, verify that the host can operate from local entitlement state:
+
+```powershell
+python manage.py check
+python manage.py authkits_check --security
+```
+
+For the outage smoke, keep the entitlement file in place, make Authkits.com
+unreachable, and repeat the local checks plus normal signup/login/MFA flows. Ordinary
+Authkits runtime must not require licensing network access after activation.
+
+Never commit the real license key or the signed entitlement token.
 
 ## Validation
 
