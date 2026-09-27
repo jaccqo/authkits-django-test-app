@@ -21,10 +21,9 @@ jobs:
       - name: Install public host dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Validate example environment and settings import
-        run: |
-          cp .env.example .env
-          python -c "import config.settings as s; assert s.DEBUG is True; assert '127.0.0.1' in s.ALLOWED_HOSTS; licensing=s.AUTHKITS['LICENSING']; assert licensing['LICENSE_KEY'] == ''; assert licensing['ENTITLEMENT_FILE'] == '.authkits/entitlement.jws'; assert licensing['ACTIVATION_URL'] == 'https://authkits.com/api/v1/licenses/activate'"
+      - name: Validate public host contract without the proprietary wheel
+        run: python -m unittest discover -s host_tests -v
 
       - name: Check Python syntax
-        run: python -m compileall -q config manage.py
+        run: python -m compileall -q config host_tests manage.py
+

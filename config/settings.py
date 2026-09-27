@@ -10,6 +10,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .integrations import require_extra, social_providers
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
@@ -157,7 +159,7 @@ AUTHKITS = {
         "LICENSE_KEY": os.environ.get("AUTHKITS_LICENSE_KEY", "").strip(),
         "ENTITLEMENT_FILE": os.environ.get(
             "AUTHKITS_ENTITLEMENT_FILE",
-            ".authkits/entitlement.jws",
+            "",
         ).strip(),
         "ACTIVATION_URL": os.environ.get(
             "AUTHKITS_ACTIVATION_URL",
@@ -171,3 +173,47 @@ AUTHKITS = {
         ),
     },
 }
+
+
+# Optional boundaries are opt-in; a base wheel never imports DRF or allauth.
+AUTHKITS_API_ENABLED = env_bool("AUTHKITS_API_ENABLED", False)
+AUTHKITS_SOCIAL_ENABLED = env_bool("AUTHKITS_SOCIAL_ENABLED", False)
+AUTHKITS["API"] = {
+    "ENABLED": AUTHKITS_API_ENABLED,
+    "CREDENTIAL_TTL": int(os.environ.get("AUTHKITS_API_CREDENTIAL_TTL", "604800")),
+    "CREDENTIAL_MAX_ACTIVE": int(os.environ.get("AUTHKITS_API_CREDENTIAL_MAX_ACTIVE", "10")),
+}
+AUTHKITS["SOCIAL"] = {"ENABLED": AUTHKITS_SOCIAL_ENABLED, "MODE": "managed"}
+
+if AUTHKITS_API_ENABLED:
+    require_extra("rest_framework", "api")
+    INSTALLED_APPS += ["rest_framework"]
+
+if AUTHKITS_SOCIAL_ENABLED:
+    require_extra("allauth", "social")
+    AUTHKITS["SOCIAL"]["PROVIDERS"] = social_providers(os.environ)
+    INSTALLED_APPS += [
+        "allauth",
+        "allauth.account",
+        "allauth.socialaccount",
+        *[
+            f"allauth.socialaccount.providers.{provider}"
+            for provider in AUTHKITS["SOCIAL"]["PROVIDERS"]
+        ],
+    ]
+    AUTHENTICATION_BACKENDS = ["allauth.account.auth_backends.AuthenticationBackend"]
+    MIDDLEWARE += ["allauth.account.middleware.AccountMiddleware"]
+    SOCIALACCOUNT_ADAPTER = "authkits.integrations.social.AuthkitsSocialAccountAdapter"
+    SOCIALACCOUNT_QUERY_EMAIL = True
+    SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
+    SOCIALACCOUNT_LOGIN_ON_GET = False
+    SOCIALACCOUNT_STORE_TOKENS = False
+    # Keep allauth's independent password/reset/email flows out of this host.
+    # Authkits enforces verified email and MFA in its social adapter.
+    SOCIALACCOUNT_ONLY = True
+    ACCOUNT_EMAIL_VERIFICATION = "none"
+    SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+    ACCOUNT_LOGIN_METHODS = {"username", "email"}
+    ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+    LOGIN_REDIRECT_URL = AUTHKITS["UI"]["LOGIN_REDIRECT"]
+    LOGOUT_REDIRECT_URL = "/"
