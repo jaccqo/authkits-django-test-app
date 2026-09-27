@@ -39,11 +39,11 @@
           Reference integration
         </div>
 
-        <h1>Secure authentication for every Django app.</h1>
+        <h1>Explore Authkits in a real Django host.</h1>
 
         <p class="hero-copy">
-          Built with high-risk applications in mind, Authkits Django brings strong account security,
-          recovery, auditability, and abuse protection to any Django project without unnecessary complexity.
+          Try the account, MFA, security, and optional API flows supplied by the installed
+          Authkits wheel. This app shows the configuration a customer owns.
         </p>
 
         <div class="hero-actions">
@@ -108,8 +108,44 @@ urlpatterns = [
 
           <a class="feature-card" href="{% url 'authkits:security_center' %}">
             <div class="feature-icon" aria-hidden="true">{ }</div>
-            <div><h3>Account security</h3><p>Review sessions, revoke access and manage optional trusted devices.</p></div>
+            <div><h3>Security Center</h3><p>Review recent security activity, MFA status, and optional trusted devices.</p></div>
             <span class="badge badge-muted">Try it</span>
+          </a>
+
+          <a class="feature-card" href="{% url 'authkits:security_sessions' %}">
+            <div class="feature-icon" aria-hidden="true">≡</div>
+            <div><h3>Sessions</h3><p>Inspect active browser sessions and revoke access after fresh authentication.</p></div>
+            <span class="badge badge-muted">Try it</span>
+          </a>
+
+          <a class="feature-card" href="{% url 'authkits:password_change' %}">
+            <div class="feature-icon" aria-hidden="true">↻</div>
+            <div><h3>Password change</h3><p>Confirm your current password and MFA before choosing a new password.</p></div>
+            <span class="badge badge-muted">Account lifecycle</span>
+          </a>
+
+          <a class="feature-card" href="{% url 'authkits:account_delete' %}">
+            <div class="feature-icon" aria-hidden="true">−</div>
+            <div><h3>Account deletion</h3><p>Review the permanent deletion flow. Fresh authentication and a final confirmation are required.</p></div>
+            <span class="badge badge-muted">Account lifecycle</span>
+          </a>
+
+          <a class="feature-card" href="{% if social_enabled %}{% url 'authkits:social_accounts' %}{% else %}https://github.com/jaccqo/authkits-django-test-app#social-auth-setup{% endif %}">
+            <div class="feature-icon" aria-hidden="true">⇄</div>
+            <div><h3>Social Auth</h3><p>GitHub and Google sign-in, connected providers, and Google reauthentication for connection changes.</p></div>
+            <span class="badge badge-muted">{% if social_enabled %}Enabled{% else %}Optional · Setup{% endif %}</span>
+          </a>
+
+          <a class="feature-card" href="https://github.com/jaccqo/authkits-django-test-app/blob/main/docs/API_EXAMPLES.md">
+            <div class="feature-icon" aria-hidden="true">{ }</div>
+            <div><h3>Headless / API</h3><p>Client examples for session and bearer authentication, MFA, security, and social OAuth.</p></div>
+            <span class="badge badge-muted">{% if api_enabled %}Enabled · Examples{% else %}Optional · Setup{% endif %}</span>
+          </a>
+
+          <a class="feature-card" href="https://github.com/jaccqo/authkits-django-test-app/blob/main/docs/RELEASE_SMOKES.md">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <div><h3>Licensing activation</h3><p>Activate explicitly, verify the signed entitlement locally, and run the customer release smokes.</p></div>
+            <span class="badge badge-muted">Operator guide</span>
           </a>
         </div>
       </section>
@@ -155,4 +191,5 @@ urlpatterns = [
   <div class="toast" role="status" aria-live="polite" data-toast></div>
 </body>
 </html>
+
 

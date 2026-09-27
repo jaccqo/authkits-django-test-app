@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 
+from django.conf import settings
 from django.core import mail
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -96,4 +97,79 @@ class AccountSecurityIntegration(TestCase):
         )
         self.assertEqual(self.client.post(reverse("authkits:logout")).status_code, 403)
         self.assertEqual(self.post("logout", {}).status_code, 302)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class AccountLifecycleIntegration(TestCase):
+    """One customer journey through the wheel's lifecycle routes, no service mocks."""
+
+    def post(self, name, data):
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(
+                reverse("authkits:" + name),
+                {**data, "csrfmiddlewaretoken": self.client.cookies["csrftoken"].value},
+                HTTP_ORIGIN="http://testserver",
+            )
+
+    def test_lifecycle_and_management_links(self):
+        from django.contrib.auth import get_user_model
+
+        self.client = Client(enforce_csrf_checks=True)
+        password = "Reference-LifeCycle-632!"
+        new_password = "Reference-LifeCycle-975!"
+        self.client.get(reverse("authkits:signup"))
+        response = self.post("signup", {
+            "username": "lifecycle", "email": "lifecycle@example.com",
+            "password": password, "password_confirm": password,
+        })
+        self.assertEqual(response.status_code, 302)
+        fields = dict(line.split(": ", 1) for line in mail.outbox[-1].body.splitlines() if ": " in line)
+        self.post("verify_email", {"challenge_id": fields["Challenge ID"],
+                                   "secret": fields["Verification code"]})
+        self.post("login", {"identifier": "lifecycle", "password": password})
+        home = self.client.get("/")
+        for name in ("password_change", "account_delete", "security_center",
+                     "security_sessions", "mfa_management"):
+            with self.subTest(name=name):
+                self.assertContains(home, reverse("authkits:" + name))
+                self.assertEqual(self.client.get(reverse("authkits:" + name)).status_code, 200)
+        if settings.AUTHKITS_SOCIAL_ENABLED:
+            from allauth.socialaccount.models import SocialAccount
+
+            providers = self.client.get(reverse("authkits:social_accounts"))
+            self.assertEqual(providers.status_code, 200)
+            for provider in settings.AUTHKITS["SOCIAL"]["PROVIDERS"]:
+                self.assertContains(providers, f'value="{provider}"')
+            if "google" in settings.AUTHKITS["SOCIAL"]["PROVIDERS"]:
+                SocialAccount.objects.create(
+                    user=get_user_model().objects.get(username="lifecycle"),
+                    provider="google", uid="reference-fixture-identity",
+                )
+                if "github" in settings.AUTHKITS["SOCIAL"]["PROVIDERS"]:
+                    SocialAccount.objects.create(
+                        user=get_user_model().objects.get(username="lifecycle"),
+                        provider="github", uid="reference-fixture-second-identity",
+                    )
+                providers = self.client.get(reverse("authkits:social_accounts"))
+                self.assertTrue(providers.context["reauth_accounts"])
+                if "github" in settings.AUTHKITS["SOCIAL"]["PROVIDERS"]:
+                    self.assertContains(providers, "Verify with Google to disconnect")
+                    self.assertContains(providers, "Disconnect Google")
+        # Merely opening the deletion page does not delete anything.
+        self.assertTrue(get_user_model().objects.filter(username="lifecycle").exists())
+        proof = self.post("password_change", {"password": password})
+        authorization = Inputs(proof.content.decode()).values["authorization"]
+        response = self.post("password_change", {
+            "authorization": authorization, "password": new_password,
+            "password_confirm": new_password,
+        })
+        self.assertContains(response, "Password changed")
+        self.assertTrue(get_user_model().objects.get(username="lifecycle").check_password(new_password))
+        proof = self.post("account_delete", {"password": new_password})
+        authorization = Inputs(proof.content.decode()).values["authorization"]
+        response = self.post("account_delete", {"authorization": authorization, "confirmation": "DELETE"})
+        self.assertContains(response, "Account deleted")
+        self.assertFalse(get_user_model().objects.filter(username="lifecycle").exists())
         self.assertNotIn("_auth_user_id", self.client.session)
