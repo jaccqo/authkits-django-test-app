@@ -1,73 +1,80 @@
-# Customer release smoke runbook
+# Authkits Django deployment verification
 
-This reference host supports the operator checks in the private package's
-`docs/V1_READINESS.md`. Use the readiness document from the **exact candidate
-revision** as the authority. These are operator procedures, not evidence that live
-production work has completed. Do not publish licenses, tokens, OAuth secrets, private
-keys, console emails or customer information in this public repo.
+Use this guide after you download an Authkits Django wheel and before you rely on it
+in a production deployment. The goal is to verify that the exact artifact you received
+installs cleanly, activates correctly, continues to verify its entitlement locally,
+and behaves as expected with the integrations you enable.
 
-Record sanitized evidence privately: candidate package revision/version, wheel
-SHA-256, host commit, Python/Django versions, profile, date, operator and pass/fail.
-Do not reuse a version number for different wheel bytes.
+Keep license keys, entitlement tokens, OAuth secrets, private signing material, email
+codes, and customer data out of screenshots, tickets, CI logs, and public artifacts.
 
-## 1. Release and signing prerequisites (operator, outside this repo)
+## 1. Verify the downloaded wheel
 
-Before claiming customer readiness:
+Download the wheel from your entitled Authkits account and keep the original filename,
+for example:
 
-1. Choose the intended RC/stable PEP 440 version. Update package metadata, status
-   classifier, changelog and README in the package repo; rebuild the exact candidate.
-2. Pass the package release matrix, database gates and artifact validators. Run its
-   `python scripts/check_release.py /path/to/candidate.whl` (also `--stable` when
-   making a stable release) and clean-wheel checks on that artifact.
-3. Coordinate the signing rollout. The inspected package includes public key ID
-   `entitlement-2026-09`, fingerprint
-   `4b894a7c2c7ee771d89ff1dd659297d112971bb51968fc82ad39eb697ae43cdb`.
-   Reconfirm the intended key in the exact candidate. Keep private key material
-   only in the Authkits.com production secret manager. Install/release the wheel
-   carrying that public key **before** enabling matching customer signing.
-4. Verify Authkits.com's production settings:
-   `AUTHKITS_ENTITLEMENT_SIGNING_PRIVATE_KEY`, `AUTHKITS_ENTITLEMENT_SIGNING_KEY_ID`,
-   and independent `AUTHKITS_ACTIVATION_FINGERPRINT_SECRET`. Retain older public keys
-   during rotations. No signing-key generation or production secret changes occur here.
-5. Finalize the commercial terms and display them in the purchase/download flow.
-   Confirm package and site wording agree with the actual terms.
+```text
+authkits_django-<version>-py3-none-any.whl
+```
 
-These gates cannot be replaced by synthetic keys, local test tokens or this host's CI.
+Record its SHA-256 before moving it between systems:
 
-## 2. Hosted download and fresh customer install
+```bash
+python -c "import hashlib,pathlib; p=pathlib.Path('/absolute/path/authkits_django-<version>-py3-none-any.whl'); print(hashlib.sha256(p.read_bytes()).hexdigest())"
+```
 
-1. Upload the exact validated candidate through Authkits admin Downloads and associate
-   it with product `django-authentication`.
-2. Confirm public release metadata discovers the intended version (the package's
-   explicit `python manage.py authkits_check` is available for update discovery).
-3. Download using a real entitled customer/test account. Verify a non-entitled account
-   and an account entitled only to a different product cannot obtain the wheel.
-4. Compare SHA-256 of the downloaded bytes against the validated candidate. For example:
+If your team stores approved build hashes, compare against that record before install.
 
-   ```bash
-   python -c "import hashlib,pathlib; p=pathlib.Path('/absolute/path/downloaded.whl'); print(hashlib.sha256(p.read_bytes()).hexdigest())"
-   ```
+For a clean integration check, run the reference app's wheel smoke runner outside an
+Authkits package source checkout:
 
-5. Run the fresh installer against those **downloaded bytes**, outside package source:
+```bash
+python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl"
+```
 
-   ```bash
-   python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl"
-   ```
+The default run creates fresh environments for the base package plus the `mfa`,
+`api`, `social`, and `api,social` installation profiles. You can also select one
+profile or supported Django line:
 
-   All five profiles must pass. Use `--django 5.2` and, on Python 3.12+, `--django 6.0`
-   when validating both supported lines. This is host integration coverage, not a
-   substitute for the private package's full supported-Python/database matrix.
-6. Create a persistent fresh clone/venv using README setup, install the same downloaded
-   wheel, migrate and check. Use this host for the real license and browser smokes below.
+```bash
+python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl" --profile api-social --django 5.2
+```
 
-A wheel built privately from `main` can validate integration but does not prove
-hosted download entitlements or a finalized release artifact.
+On Python 3.12+, also verify Django 6.0 if that is the line you plan to deploy.
 
-## 3. Real license activation and local verification
+## 2. Install into your application
 
-Use an actual entitled disposable Authkits account/license for `django-authentication`.
-Keep the key in this host's untracked `.env`/secret manager; do not put it in a shell
-command, ticket, screenshot or CI log. Start with no configured entitlement source.
+Create or activate your application's virtual environment and install the downloaded
+wheel directly:
+
+```bash
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl"
+```
+
+Install optional boundaries only when you use them:
+
+```bash
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[api]"
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[social]"
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[api,social]"
+```
+
+Then run:
+
+```bash
+python manage.py migrate
+python manage.py check
+```
+
+If you are using this reference app, also run:
+
+```bash
+python manage.py test config -v 2
+```
+
+## 3. Activate the license
+
+Put the license key only in your untracked environment or secret manager:
 
 ```dotenv
 AUTHKITS_LICENSE_KEY=<set privately>
@@ -75,15 +82,19 @@ AUTHKITS_ENTITLEMENT_FILE=
 AUTHKITS_ACTIVATION_URL=https://authkits.com/api/v1/licenses/activate
 ```
 
-From the host root:
+Activate once and write the signed entitlement locally:
 
 ```bash
 python manage.py authkits_activate --output .authkits/entitlement.jws
 ```
 
-Success means the package verified the signed response before persisting it. Set
-`AUTHKITS_ENTITLEMENT_FILE=.authkits/entitlement.jws` in `.env`, then restart the host.
-Verify in a fresh process without printing the token:
+After successful activation, configure:
+
+```dotenv
+AUTHKITS_ENTITLEMENT_FILE=.authkits/entitlement.jws
+```
+
+Restart the application and verify the entitlement in a fresh process:
 
 ```bash
 python manage.py check
@@ -91,78 +102,118 @@ python manage.py shell -c "from authkits.licensing.runtime import get_verified_e
 python manage.py authkits_check --security
 ```
 
-On POSIX, inspect permissions without reading the contents:
+The entitlement is verified locally during normal runtime. Do not print or log the
+compact JWS itself.
+
+On POSIX systems, restrict the entitlement file and containing directory to the
+service identity. On Windows, apply an ACL appropriate for the account running Django.
+
+## 4. Verify offline runtime behavior
+
+After activation, test that normal authentication does not depend on Authkits.com.
+
+In a disposable local environment, temporarily remove network access or block outbound
+access to `authkits.com`. Keep the existing entitlement file and your local TOTP
+encryption keys unchanged.
+
+While offline, restart Django and run:
 
 ```bash
-python -c "from pathlib import Path; p=Path('.authkits/entitlement.jws'); assert p.is_file(); assert p.stat().st_mode & 0o777 == 0o600; print('Entitlement file mode is 0600')"
+python manage.py check
+python manage.py shell -c "from authkits.licensing.runtime import get_verified_entitlement; get_verified_entitlement(required=True); print('Local entitlement verification passed')"
 ```
 
-Check the parent directory too (newly created activation directories are 0700).
-On Windows, inspect and restrict the file/directory ACL to the intended operator or
-service identity; POSIX mode bits do not demonstrate Windows access control.
-Review logs/audit using a secret-safe process and verify that no raw license key or
-JWS was recorded. Never paste matching secret-bearing log lines into evidence.
-`authkits_check --security` may flag this development host; resolve deployment-specific
-findings before production. Its output is not a deployment certification.
+Then exercise the flows your application uses, such as:
 
-## 4. Authkits.com outage smoke
+- signup and email verification
+- password login and logout
+- password recovery
+- email MFA and TOTP MFA
+- recovery-code login
+- Security Center
+- session inventory and revocation
+- password change
+- account deletion on a disposable account
 
-After successful activation, leave the verified entitlement and Django/TOTP keys intact.
+These normal runtime flows should continue to work with the previously verified local
+entitlement. Explicit activation and update-discovery commands are network-dependent
+and should fail cleanly while the service is unreachable without damaging the existing
+entitlement.
 
-1. In an isolated local test host, use a reversible firewall/DNS/network policy to deny
-   outbound access to `authkits.com`. Keep localhost, your test email delivery and OAuth
-   provider access available if exercising those features. Do not change the real
-   production site's networking. Record the exact local block and how to remove it.
-2. Verify the block from the host without sending a license or token. A bounded
-   connection to `https://authkits.com` must fail. Do not merely change the activation
-   URL; that would not prove runtime independence from the actual service.
-3. Restart Django and run the local entitlement verification and `manage.py check`
-   commands above. They must succeed offline.
-4. On fresh disposable accounts, repeat signup/email verification, password login,
-   MFA enrollment/login, password recovery, recovery-code login and session inventory/
-   revocation. Check the rejected browser after revocation. Normal auth must succeed
-   under the block. The console email backend keeps local delivery testable.
-5. Run the explicit `authkits_activate` and `authkits_check` update-discovery commands
-   under the block. Only these network-dependent operator actions should report a
-   controlled network failure/unavailability. A failed activation must leave the
-   previously verified entitlement untouched; verify it locally again.
-6. Remove the local block, confirm connectivity is restored, and record sanitized
-   pass/fail evidence. Keep all readiness boxes open until the actual test is done.
+Restore network access when the test is complete.
 
-The clean-wheel runner deliberately excludes real entitlement state, so it cannot
-substitute for this activated-host outage test.
+## 5. Verify TOTP setup
 
-## 5. Live OAuth callbacks and Authkits security handoff
+If you enable TOTP, configure a Fernet key in `AUTHKITS_TOTP_KEYS` and open
+`/auth/security/mfa/`.
 
-Automated host tests validate configuration, discovery, protected management pages,
-Google proof controls, and the headless launch/pending exchange without contacting
-providers. To finish real provider validation:
+The default Authkits setup page should show:
 
-1. Configure both real local OAuth clients using README callbacks and run migrations/checks.
-2. Create and verify a disposable password account. From `/auth/security/social/`,
-   connect GitHub with fresh password proof and finish the real provider callback.
-3. Connect Google deliberately from the same management page. Confirm both connections
-   appear. Sign out and test GitHub and Google login separately.
-4. Enroll email/TOTP MFA and repeat OAuth login. Confirm Authkits requires the factor
-   before completed access, records the session, and shows safe security activity.
-5. From provider management choose **Verify with Google** to disconnect the other
-   provider. Complete the provider-native prompt as the exact connected identity,
-   then complete Authkits MFA if required. Confirm the connection change succeeds.
-6. Reconnect as needed and test password + MFA disconnect. This host's social-only
-   allauth setting preserves the last connected social provider; that refusal is
-   expected even though Authkits also supports password login.
-7. Repeat the API examples' headless social begin → browser callback → exchange flow.
-   With MFA enabled use the returned `mfa_transaction` and final social-MFA endpoint.
-   Confirm the bearer works and the temporary browser login is not retained.
-8. Test a new social-only account too. Provider-verified email must satisfy Authkits'
-   verification policy; otherwise verify email first. Normal GitHub login is not
-   forced fresh proof. Password-primary operations require a usable local password.
+- a locally generated QR code
+- the manual TOTP secret
+- the authenticator deep link
+- the six-digit confirmation field
 
-## Completion record
+Scan the QR code in an authenticator app and confirm setup with the generated code.
+If you override the MFA template, use the documented Authkits template context/helper
+rather than rebuilding the provisioning URI yourself.
 
-Keep a private record with explicit outcomes for: candidate validation/version,
-production key/secret rollout, real activation, local signature verification and file
-permissions, outage behavior, entitled/wrong-product downloads, downloaded-wheel
-profiles, live provider callbacks/MFA, and commercial terms. Leave incomplete items
-marked **pending**, with their owner and failed/missing evidence. This public repo
-contains no assertion that those production-only gates have passed.
+## 6. Verify social authentication
+
+If you enable `[social]`, configure your own GitHub and/or Google OAuth applications
+using the callback URLs documented in the README.
+
+Verify each provider you ship:
+
+1. Sign in with the provider.
+2. Connect the provider to an existing password account.
+3. Confirm deliberate disconnect behavior from `/auth/security/social/`.
+4. With MFA enabled, confirm OAuth hands off to Authkits MFA before completed access.
+5. For Google, verify the package's fresh-provider reauthentication flow where required.
+6. If you also enable the API, test the headless social begin → callback → exchange
+   flow from [the API guide](API_EXAMPLES.md).
+
+Use disposable test accounts and keep provider credentials out of source control.
+
+## 7. Verify API and headless flows
+
+If `AUTHKITS_API_ENABLED=1`, walk through the examples in
+[API_EXAMPLES.md](API_EXAMPLES.md) for the flows your client uses:
+
+- browser-session signup/login/recovery
+- bearer credential issue, rotation, and revocation
+- fully headless password + MFA login
+- bearer-bound step-up
+- security/session inventories
+- password change and account deletion
+- headless social OAuth
+
+Verify both successful and expected-denial paths. Do not weaken Authkits checks to make
+a test pass.
+
+## 8. Production checklist
+
+Before deploying, confirm your application has production-appropriate settings for:
+
+- HTTPS and secure cookies
+- `ALLOWED_HOSTS` and CSRF trusted origins
+- email delivery
+- database and backups
+- static-file hosting
+- proxy/header trust
+- secret management
+- logging and analytics redaction
+- entitlement-file permissions
+- OAuth callback URLs and credentials, if enabled
+- trusted-device HTTPS requirements, if enabled
+- admin and any alternate authentication entry points
+
+Authkits protects the package routes it owns. Your Django deployment, infrastructure,
+admin policy, and any additional authentication surfaces remain your responsibility.
+
+## Recommended record
+
+For repeatable deployments, keep a private deployment record containing the Authkits
+version, wheel SHA-256, Python/Django versions, enabled extras, application commit,
+activation date, and the pass/fail result of the checks above. Do not include raw
+license keys, entitlement tokens, OAuth secrets, or MFA recovery codes.
