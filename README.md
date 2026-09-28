@@ -296,7 +296,7 @@ Provider credentials in automated tests are inert fixtures: no real callback is
 claimed. These host tests verify your integration surface. Authkits itself provides the
 package-level security and provider-protocol behavior exercised through these routes.
 
-Run customer-style clean installs outside any source checkout:
+Run clean wheel-install checks outside any source checkout:
 
 ```bash
 python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl"
