@@ -128,8 +128,10 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 Put it in `AUTHKITS_TOTP_KEYS` in `.env`. Do not reuse `DJANGO_SECRET_KEY`.
 Rotation keys are comma-separated, newest first; retain old keys while encrypted
 factors still need them. Leave blank for email MFA only. Enroll through
-`/auth/security/mfa/`, save one-time recovery codes privately, then test login and
-sensitive management with the enrolled factor.
+`/auth/security/mfa/`; the package-owned setup page shows a locally generated QR code,
+the manual secret fallback, and the authenticator deep link. Save one-time recovery
+codes privately, then test login and sensitive management with the enrolled factor.
+No host migration, QR service, Pillow install, or template configuration is required.
 
 Keep `AUTHKITS_MFA_ENFORCED=0` while enrolling initial accounts. Enabling global
 MFA without usable enrolled factors can block login; do not disable checks to work

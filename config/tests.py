@@ -1,4 +1,6 @@
+from copy import deepcopy
 from html.parser import HTMLParser
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core import mail
@@ -98,6 +100,58 @@ class AccountSecurityIntegration(TestCase):
         self.assertEqual(self.client.post(reverse("authkits:logout")).status_code, 403)
         self.assertEqual(self.post("logout", {}).status_code, 302)
         self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_totp_setup_uses_package_qr_and_confirms_normally(self):
+        from cryptography.fernet import Fernet
+        from django.contrib.auth import get_user_model
+
+        from authkits.mfa.totp import code_at
+
+        password = "Reference-Totp-Password-746!"
+        user = get_user_model().objects.create_user(
+            username="totp-example",
+            email="totp@example.com",
+            password=password,
+        )
+        configuration = deepcopy(settings.AUTHKITS)
+        configuration["ACCOUNTS"] = {
+            **configuration["ACCOUNTS"],
+            "REQUIRE_EMAIL_VERIFICATION": False,
+        }
+        configuration["MFA"] = {
+            **configuration["MFA"],
+            "TOTP_ENABLED": True,
+            "ENCRYPTION_KEYS": [Fernet.generate_key().decode()],
+        }
+
+        with self.settings(AUTHKITS=configuration):
+            self.client = Client(enforce_csrf_checks=True)
+            self.client.get(reverse("authkits:signup"))
+            self.assertEqual(
+                self.post(
+                    "login",
+                    {"identifier": user.username, "password": password},
+                ).status_code,
+                302,
+            )
+            result = self.post(
+                "mfa_management",
+                {"action": "mfa.setup.totp", "password": password},
+            )
+            self.assertEqual(result.status_code, 200)
+            setup = result.context["setup"]
+            self.assertEqual(result.context["totp_uri"], setup.uri)
+            self.assertContains(result, 'class="ak-totp-qr"')
+            self.assertContains(result, setup.secret)
+            fields = Inputs(result.content.decode()).values
+            with patch("authkits.mfa.totp.time.time", return_value=3000):
+                confirmed = self.post(
+                    "mfa_confirm",
+                    {**fields, "code": code_at(setup.secret, 100)},
+                )
+
+        self.assertContains(confirmed, "MFA enabled")
+        self.assertNotContains(confirmed, 'class="ak-totp-qr"')
 
 
 
