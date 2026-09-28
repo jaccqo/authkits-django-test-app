@@ -1,18 +1,19 @@
-# Authkits API client examples
+# Using the Authkits API
+
+This guide shows how to call the Authkits Django API from your application.
 
 Install your licensed wheel with `[api]`, set `AUTHKITS_API_ENABLED=1`, migrate,
-and restart. For social OAuth also install `[social]` and complete the README's
-OAuth setup. All routes below belong to the installed package under `/api/v1/auth/`.
-The host supplies no authentication endpoints of its own.
+and restart. If you also need social OAuth, install `[social]` and complete the
+OAuth setup in the main README. Authkits mounts its API under `/api/v1/auth/`;
+your project only needs to include the package routes as shown by this reference app.
 
-These are same-origin JavaScript examples (no frontend build required). Use them in
-a local client module attached to forms. Arguments such as passwords, email codes,
-and IDs come from the user or the preceding response. These functions do not run
-any operation until explicitly called. Keep secrets in memory for the flow; never
-log responses, put bearer/transaction tokens in URLs or localStorage, or capture
-these bodies in analytics. Use HTTPS in production and a secure native credential
-store for native clients. Cross-origin CORS/deployment policy is host-owned and is
-not configured in this example.
+The examples below use same-origin JavaScript and do not require a frontend build.
+Adapt them to your own client layer. Values such as passwords, email codes, transaction
+IDs, and resource IDs come from the user or from a previous Authkits response. Keep
+secrets in memory for the active flow; never log bearer or transaction tokens, place
+them in URLs or localStorage, or capture sensitive request/response bodies in analytics.
+Use HTTPS in production and a secure credential store for native clients. CORS and
+cross-origin deployment policy remain application-level decisions.
 
 ## Shared transport
 
@@ -89,7 +90,7 @@ fully headless MFA. `logout/` ends a browser session; bearer logout is self-revo
 ## Bearer issue, current, rotate, revoke
 
 ```js
-const issueCredential = () => sessionPost("credentials/issue/", {label: "reference client"});
+const issueCredential = () => sessionPost("credentials/issue/", {label: "web client"});
 const currentCredential = token => bearerGet("credentials/current/", token);
 const rotateCredential = token => bearerPost("credentials/rotate/", token);
 const revokeCredential = token => bearerPost("credentials/revoke/", token);
@@ -106,7 +107,7 @@ reveal it. Omitting `scopes` uses the package's default management scope set:
 
 ```js
 const headlessLogin = (identifier, password) => headlessPost("headless/login/", {
-  identifier, password, label: "headless reference",
+  identifier, password, label: "headless client",
 });
 const sendLoginEmail = transaction => headlessPost("headless/mfa/email/send/", {transaction});
 const finishLogin = (transaction, method, code) => headlessPost("headless/mfa/complete/", {
@@ -204,7 +205,7 @@ disabled, session inventory reports `enabled=false` with an empty list.
 
 ```js
 const beginSocial = provider => headlessPost("headless/social/begin/", {
-  provider, label: "social reference",
+  provider, label: "social client",
 });
 const exchangeSocial = transaction => headlessPost("headless/social/exchange/", {transaction});
 const finishSocialMFA = (socialTransaction, mfaTransaction, method, code) =>

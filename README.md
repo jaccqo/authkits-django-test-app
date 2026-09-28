@@ -1,17 +1,17 @@
 # Authkits Django Reference App
 
-A public, customer-style Django host for the current Authkits Django v1 feature
-surface. It consumes the licensed wheel; authentication and security behavior stay
-inside Authkits. This host supplies environment loading, Django settings, URLs,
-SQLite, local email, and simple grayscale templates. No frontend build is required.
+A complete reference Django application for integrating Authkits Django into a real
+project. It installs the licensed Authkits wheel and demonstrates the current browser,
+MFA, session, social-auth, API, account-security, and licensing flows without copying
+Authkits package internals into your application.
 
-**Never commit the proprietary wheel, private package source, production secrets,
-license keys, or entitlement tokens here. This is a reference host, not a full
-production deployment template.**
+The app provides a small host project with environment loading, Django settings, URLs,
+SQLite, console email, and simple grayscale templates so you can see the integration
+surface clearly. No frontend build is required.
 
-The integration was checked against package `main` at
-`400dfa5e03f447a2de777bb17dceabaa7988a3f5` (`0.1.0a1`, pre-alpha metadata).
-Repository readiness does not certify completion of the production release gates.
+**Keep your licensed wheel, license key, entitlement token, OAuth credentials, and
+other production secrets outside version control.** This repository is an integration
+example, not a turnkey production deployment configuration.
 
 ## What it demonstrates
 
@@ -29,7 +29,9 @@ Repository readiness does not certify completion of the production release gates
 | Explicit activation and offline entitlement verification | [release smoke guide](docs/RELEASE_SMOKES.md) |
 
 The homepage links to these packaged routes and labels optional integrations according
-to the current configuration. Authkits templates remain package-owned and overrideable.
+to the current configuration. Authkits templates remain package-owned and overrideable, so you can start with the
+default UI and replace individual templates when your application needs custom markup
+or styling.
 
 ## Base install
 
@@ -63,10 +65,10 @@ this checkout. Substitute its actual version/path in these commands:
 python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl"
 ```
 
-The public `requirements.txt` intentionally does not install Authkits. Do not copy
-package source here or use an editable source checkout as evidence of customer-wheel
-readiness. Maintainers may build a candidate privately for integration testing; the
-real hosted-download smoke is a separate release gate.
+The public `requirements.txt` intentionally does not install Authkits. Install the
+wheel you downloaded from your Authkits account so your application uses the same
+packaged artifact you would deploy. Avoid copying package source into your project or
+depending on an editable checkout.
 
 ## Optional installs
 
@@ -219,7 +221,7 @@ usable local password (set through Authkits recovery) for password-primary lifec
 operations such as account deletion. Headless social additionally requires the API
 flag and uses the same provider configuration.
 
-## Customer-style smoke flow
+## End-to-end verification flow
 
 Use disposable local accounts. Verification/reset/email-MFA codes appear in the
 local console; never use console email or publish its output in production.
@@ -238,8 +240,8 @@ local console; never use console email or publish its output in production.
 8. With API enabled, follow the client examples for session and cookie-free bearer
    login, MFA, rotation/revocation, step-up, inventories and lifecycle changes.
 9. Exercise trusted devices separately over HTTPS; inspect, use, rotate and revoke.
-10. Perform real activation, offline verification, outage and downloaded-wheel checks
-    using [the release smoke guide](docs/RELEASE_SMOKES.md).
+10. Verify activation, offline entitlement use, downloaded-wheel installation, and
+    outage behavior using the [deployment verification guide](docs/RELEASE_SMOKES.md).
 
 Abuse controls also apply to successful security operations. Use separate test
 accounts/flows and respect retry windows if repeated manual actions exhaust budgets.
@@ -265,13 +267,13 @@ fails with `authkits.E006`; do not silence it. The package verifies the JWS loca
 before atomic persistence. `.authkits/` is ignored. A valid local entitlement is
 used without normal authentication depending on Authkits.com.
 
-This setup is not evidence of completed production activation. Key rollout, real
-activation/download authorization, outage verification, release version and commercial
-terms remain operator gates in [RELEASE_SMOKES.md](docs/RELEASE_SMOKES.md).
+For a production deployment, also verify downloaded-wheel integrity, local entitlement
+verification, outage behavior, and any enabled OAuth flows using
+[the deployment verification guide](docs/RELEASE_SMOKES.md).
 
 ## Validation and CI
 
-Public CI intentionally has **no proprietary wheel**:
+The repository's public CI does not require access to your licensed wheel:
 
 ```bash
 python -m unittest discover -s host_tests -v
@@ -291,10 +293,10 @@ python manage.py test config -v 2
 The suite uses real package routes, normal password hashing and enforced CSRF. API
 tests explicitly skip when disabled; combined OAuth launch tests require both flags.
 Provider credentials in automated tests are inert fixtures: no real callback is
-claimed. The package's private test suite remains responsible for exhaustive security
-and provider-protocol coverage.
+claimed. These host tests verify your integration surface. Authkits itself provides the
+package-level security and provider-protocol behavior exercised through these routes.
 
-Run customer-style clean installs outside any source checkout:
+Run clean wheel-install checks outside any source checkout:
 
 ```bash
 python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl"
@@ -306,8 +308,8 @@ The default runs fresh base, `[mfa]`, `[api]`, `[social]`, and `[api,social]` vi
 environments. It copies only host files, installs the supplied wheel, verifies its
 installed location, migrates, checks, and tests. Base/MFA lanes assert allauth and DRF
 are absent. Local secrets/entitlements are not copied; this runner **does not**
-perform real activation or live OAuth. Use it in local/private CI, never expose a
-licensed wheel to public PR jobs or upload it as a public artifact.
+perform real activation or live OAuth. Use it locally or in CI that can access your licensed artifact. Do not publish the
+wheel as a public build artifact or expose it in logs.
 
 ## Production boundaries
 
