@@ -227,3 +227,27 @@ class AccountLifecycleIntegration(TestCase):
         self.assertContains(response, "Account deleted")
         self.assertFalse(get_user_model().objects.filter(username="lifecycle").exists())
         self.assertNotIn("_auth_user_id", self.client.session)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class AdminSecurityIntegration(TestCase):
+    def test_admin_is_gated_by_authkits_and_requires_staff_mfa(self):
+        from django.contrib.auth import get_user_model
+
+        password = "Reference-Admin-Password-842!"
+        user = get_user_model().objects.create_user(
+            username="admin-example",
+            email="admin@example.com",
+            password=password,
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client.force_login(user)
+
+        first = self.client.get("/admin/")
+        self.assertEqual(first.status_code, 302)
+        self.assertTrue(first.url.startswith(reverse("authkits:admin_access")))
+
+        gate = self.client.get(first.url)
+        self.assertContains(gate, "requires multi-factor authentication")
+        self.assertContains(gate, reverse("authkits:mfa_management"))
