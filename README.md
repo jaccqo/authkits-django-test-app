@@ -27,6 +27,7 @@ example, not a turnkey production deployment configuration.
 | Optional GitHub/Google login, connect/disconnect, Google reauthentication | `/auth/login/`, `/auth/security/social/` |
 | Optional DRF/session and headless bearer APIs, MFA, lifecycle, inventories, OAuth | `/api/v1/auth/`; [client examples](docs/API_EXAMPLES.md) |
 | Explicit activation and offline entitlement verification | [release smoke guide](docs/RELEASE_SMOKES.md) |
+| Authkits-protected Django admin | `/admin/` |
 
 The homepage links to these packaged routes and labels optional integrations according
 to the current configuration. Authkits templates remain package-owned and overrideable, so you can start with the
@@ -143,6 +144,39 @@ Session tracking uses the package's middleware after Django authentication middl
 `AUTHKITS_TRUSTED_DEVICES=1` is for a correctly configured HTTPS host only; the secure
 `__Host-` cookie does not work over ordinary HTTP. Trusted-device proof does not
 replace fresh MFA for sensitive operations. Keep it off for the default local setup.
+
+## Secure Django admin
+
+This reference app keeps Django's normal `admin.site` and places Authkits in front of
+the admin namespace.
+
+The default local environment enables:
+
+```dotenv
+AUTHKITS_ADMIN_ENABLED=1
+AUTHKITS_ADMIN_REQUIRE_MFA=1
+AUTHKITS_ADMIN_REQUIRE_VERIFIED_EMAIL=1
+AUTHKITS_ADMIN_FRESH_MFA_TTL=300
+```
+
+The middleware is already installed after Django authentication middleware. With this
+policy, `/admin/` requires an active staff user, verified email, an enrolled Authkits
+MFA method, and fresh MFA assurance. If the current assurance is stale, Authkits asks
+for the current password and then reuses the package's normal MFA step-up flow before
+returning to the requested admin URL.
+
+Django still owns `is_staff`, `is_superuser`, model permissions, admin registrations,
+and custom admin actions. Authkits protects the authentication/security boundary; it
+does not replace Django's authorization model.
+
+For local testing, create a staff/superuser account, complete normal Authkits email
+verification and MFA enrollment, then visit:
+
+```text
+http://127.0.0.1:8000/admin/
+```
+
+The stock Django admin login should not become an alternate authentication path.
 
 ## API setup
 
