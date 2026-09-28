@@ -80,8 +80,10 @@ class APIReferenceIntegration(TestCase):
             "headless_social_exchange": "headless/social/exchange/",
             "headless_social_mfa_complete": "headless/social/mfa/complete/",
         }
+        documentation = (settings.BASE_DIR / "docs" / "API_EXAMPLES.md").read_text()
         for name, suffix in routes.items():
             with self.subTest(name=name):
+                self.assertIn(suffix, documentation)
                 self.assertEqual(reverse("authkits_api:" + name), "/api/v1/auth/" + suffix)
                 self.assertTrue(resolve("/api/v1/auth/" + suffix).func.__module__.startswith("authkits."))
 

@@ -25,5 +25,5 @@ jobs:
         run: python -m unittest discover -s host_tests -v
 
       - name: Check Python syntax
-        run: python -m compileall -q config host_tests manage.py
+        run: python -m compileall -q config host_tests scripts manage.py
 

@@ -1,216 +1,317 @@
 # Authkits Django Reference App
 
-This repository is the public customer-style integration sandbox for **Authkits Django**.
+A public, customer-style Django host for the current Authkits Django v1 feature
+surface. It consumes the licensed wheel; authentication and security behavior stay
+inside Authkits. This host supplies environment loading, Django settings, URLs,
+SQLite, local email, and simple grayscale templates. No frontend build is required.
 
-It is intentionally a normal Django host application. The private Authkits package
-owns authentication and account-security behavior; this repository owns Django
-settings, environment loading, email, database, middleware, templates and deployment
-choices.
+**Never commit the proprietary wheel, private package source, production secrets,
+license keys, or entitlement tokens here. This is a reference host, not a full
+production deployment template.**
 
-The paid Authkits package source and wheel are never committed here.
+The integration was checked against package `main` at
+`400dfa5e03f447a2de777bb17dceabaa7988a3f5` (`0.1.0a1`, pre-alpha metadata).
+Repository readiness does not certify completion of the production release gates.
 
-## What this app demonstrates
+## What it demonstrates
 
-- signup and email verification
-- login and logout
-- password recovery
-- email MFA
-- encrypted authenticator/TOTP MFA
-- recovery codes
-- step-up authentication
-- security center
-- session inventory and revocation
-- trusted-device configuration hooks
-- host-owned environment and Django configuration
-- licensed activation with a signed offline entitlement
+| Area | Reference entry point |
+| --- | --- |
+| Signup, verification, login/logout, password recovery | `/auth/signup/`, `/auth/login/`, `/auth/password/reset/` |
+| Email MFA, TOTP, recovery codes, fresh step-up | `/auth/security/mfa/` |
+| Security Center and safe recent activity | `/auth/security/` |
+| Session inventory and revocation | `/auth/security/sessions/` |
+| Password change | `/auth/security/password/` |
+| Permanent account deletion | `/auth/security/delete-account/` |
+| Optional trusted devices (HTTPS required) | `/auth/security/devices/` |
+| Optional GitHub/Google login, connect/disconnect, Google reauthentication | `/auth/login/`, `/auth/security/social/` |
+| Optional DRF/session and headless bearer APIs, MFA, lifecycle, inventories, OAuth | `/api/v1/auth/`; [client examples](docs/API_EXAMPLES.md) |
+| Explicit activation and offline entitlement verification | [release smoke guide](docs/RELEASE_SMOKES.md) |
 
-Social/django-allauth examples will be added when the provider-flow checkpoints ship.
-Headless/DRF examples remain a later phase.
+The homepage links to these packaged routes and labels optional integrations according
+to the current configuration. Authkits templates remain package-owned and overrideable.
 
-## 1. Create the host environment
+## Base install
 
-### Windows PowerShell
+Use Python 3.10+ with Django 5.2, or Python 3.12+ for Django 6.0. The requirements
+allow both supported Django lines; choose one deliberately for your application.
+
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-
 Copy-Item .env.example .env
 ```
 
-### macOS / Linux
+macOS/Linux:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-
 cp .env.example .env
 ```
 
-The real `.env` is gitignored.
+Download the licensed wheel from your entitled Authkits account and keep it outside
+this checkout. Substitute its actual version/path in these commands:
 
-## 2. Install the Authkits wheel
-
-Build the private package first, then install that wheel into this virtual environment.
-
-Base account/security install:
-
-```powershell
-python -m pip install "C:\path\to\authkits-django\dist\authkits_django-0.1.0a1-py3-none-any.whl"
+```bash
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl"
 ```
 
-For authenticator/TOTP testing, install the wheel with the MFA extra:
+The public `requirements.txt` intentionally does not install Authkits. Do not copy
+package source here or use an editable source checkout as evidence of customer-wheel
+readiness. Maintainers may build a candidate privately for integration testing; the
+real hosted-download smoke is a separate release gate.
 
-```powershell
-python -m pip install "C:\path\to\authkits-django\dist\authkits_django-0.1.0a1-py3-none-any.whl[mfa]"
+## Optional installs
+
+Install extras from the **same downloaded wheel**, not an assumed public package index:
+
+```bash
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[mfa]"
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[api]"
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[social]"
+python -m pip install "/absolute/path/authkits_django-<version>-py3-none-any.whl[api,social]"
 ```
 
-The public `requirements.txt` deliberately does **not** install Authkits. A customer
-receives the licensed wheel separately.
+| Package extra | Current dependency contract |
+| --- | --- |
+| `authkits-django[mfa]` | Historical compatibility extra; `cryptography>=44` is already a base dependency |
+| `authkits-django[api]` | `djangorestframework>=3.18,<4` |
+| `authkits-django[social]` | `django-allauth[socialaccount]>=65.19.4,<66` |
+| `authkits-django[api,social]` | Both optional boundaries |
 
-## 3. Configure `.env`
+Installing an extra does not enable it. Both flags default off. Explicitly enabling
+an integration without its dependency fails with an install instruction. Social mode
+also requires at least one complete credential pair. No OAuth setup or DRF install is
+needed for base account/security flows.
 
-The checked-in `.env.example` contains every local setting used by this reference
-app. Its defaults are safe for local development only.
+## Local environment and startup
 
-For TOTP/authenticator testing, generate a Fernet key:
+Edit the untracked `.env` using `.env.example`. Environment variables already set in
+your shell take precedence. Defaults are **local development only**:
 
-```powershell
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
+- SQLite, Django development server, and console email.
+- Required email verification; session tracking on.
+- Email MFA available; TOTP enabled when encryption keys are supplied.
+- Global MFA enforcement, trusted devices, API, and social auth off.
+- No configured entitlement file until activation has created one.
 
-Paste the output into:
-
-```env
-AUTHKITS_TOTP_KEYS=YOUR_GENERATED_KEY
-```
-
-Do not reuse Django `SECRET_KEY` as the TOTP encryption key.
-
-Leave this disabled during ordinary HTTP development:
-
-```env
-AUTHKITS_TRUSTED_DEVICES=0
-```
-
-Trusted devices require correctly configured HTTPS and secure cookies.
-
-## 4. Run the app
-
-```powershell
+```bash
 python manage.py migrate
 python manage.py check
 python manage.py runserver
 ```
 
-Open:
+Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/). Use the same hostname
+throughout OAuth and email flows. Optionally set
+`AUTHKITS_EMAIL_BASE_URL=http://127.0.0.1:8000` for local email links. Restart after
+changing settings and run migrations after enabling social auth.
 
-```text
-http://127.0.0.1:8000/
+`DJANGO_CSRF_TRUSTED_ORIGINS` is a comma-separated list of exact origins when needed;
+do not add wildcards to solve a mismatched local hostname. No production proxy, CORS,
+SMTP, database, or static-file deployment configuration is implied by this host.
+
+## MFA and session setup
+
+Generate a dedicated Fernet encryption key locally:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Authkits routes are mounted under `/auth/`.
+Put it in `AUTHKITS_TOTP_KEYS` in `.env`. Do not reuse `DJANGO_SECRET_KEY`.
+Rotation keys are comma-separated, newest first; retain old keys while encrypted
+factors still need them. Leave blank for email MFA only. Enroll through
+`/auth/security/mfa/`, save one-time recovery codes privately, then test login and
+sensitive management with the enrolled factor.
 
-## Manual test flow
+Keep `AUTHKITS_MFA_ENFORCED=0` while enrolling initial accounts. Enabling global
+MFA without usable enrolled factors can block login; do not disable checks to work
+around this. `AUTHKITS_MFA_ALLOWED_METHODS` defaults to `totp,email`.
 
-Use a fresh account and walk through the package as a customer would:
+Session tracking uses the package's middleware after Django authentication middleware.
+`AUTHKITS_TRUSTED_DEVICES=1` is for a correctly configured HTTPS host only; the secure
+`__Host-` cookie does not work over ordinary HTTP. Trusted-device proof does not
+replace fresh MFA for sensitive operations. Keep it off for the default local setup.
 
-1. Create an account at `/auth/signup/`.
-2. Read the console email and complete email verification.
-3. Sign in and open `/auth/security/`.
-4. Enroll email MFA.
-5. Generate recovery codes and verify that a used code cannot replay.
-6. If `AUTHKITS_TOTP_KEYS` is configured, enroll an authenticator app.
-7. Exercise MFA-gated login.
-8. Exercise password-protected/step-up security changes.
-9. Sign in from a second browser and revoke that session.
-10. Test trusted devices separately over HTTPS.
+## API setup
 
-The console email backend is intentional for local testing so verification, password
-reset and email-MFA codes are visible in the terminal. Never use it in production.
+Install `[api]`, then set:
 
-## Environment contract
+```dotenv
+AUTHKITS_API_ENABLED=1
+AUTHKITS_API_CREDENTIAL_TTL=604800
+AUTHKITS_API_CREDENTIAL_MAX_ACTIVE=10
+```
 
-The most useful local controls are:
+Run `migrate` and `check`, then restart. The host conditionally mounts exactly:
 
-```env
-DJANGO_DEBUG=1
-DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
-AUTHKITS_REQUIRE_EMAIL_VERIFICATION=1
-AUTHKITS_SESSION_TRACKING=1
-AUTHKITS_MFA_ENFORCED=0
-AUTHKITS_MFA_ALLOWED_METHODS=totp,email
-AUTHKITS_TOTP_KEYS=
-AUTHKITS_LICENSE_KEY=
+```python
+path("api/v1/auth/", include("authkits.api.urls"))
+```
+
+Disabled means unmounted: base startup does not import DRF. The package validates
+supported dependencies/configuration; the host does not replace its API classes or
+implement auth services. See [API examples](docs/API_EXAMPLES.md) for all v1 flows,
+including CSRF bootstrap, session login, headless MFA, credentials, step-up, account
+lifecycle, security/session management, and headless social OAuth.
+
+## Social auth setup
+
+Install `[social]` (or `[api,social]`), and create your own local OAuth applications
+in the GitHub developer settings and Google Cloud OAuth configuration. Use a Web
+application for Google, configure its consent screen and add test users if the app
+is in testing mode. Register these exact local callbacks:
+
+| Provider | Homepage / origin | Callback / authorized redirect URI |
+| --- | --- | --- |
+| GitHub | `http://127.0.0.1:8000` | `http://127.0.0.1:8000/accounts/github/login/callback/` |
+| Google | `http://127.0.0.1:8000` | `http://127.0.0.1:8000/accounts/google/login/callback/` |
+
+If you choose `localhost`, register that exact hostname and use it consistently in
+browser URLs, allowed hosts, and email base URL. Production uses its own HTTPS
+callbacks and credentials.
+
+Set one or both **complete** credential pairs in the untracked environment:
+
+```dotenv
+AUTHKITS_SOCIAL_ENABLED=1
+AUTHKITS_GITHUB_CLIENT_ID=
+AUTHKITS_GITHUB_CLIENT_SECRET=
+AUTHKITS_GOOGLE_CLIENT_ID=
+AUTHKITS_GOOGLE_CLIENT_SECRET=
+```
+
+Fill the fields for each provider you want; leave the other pair blank. Then run
+`python manage.py migrate`, `python manage.py check`, and restart. `/auth/login/`
+discovers configured providers and renders CSRF-protected POST buttons.
+
+The host configures Authkits-managed credentials, the Authkits social adapter,
+provider apps, the allauth backend/middleware and `/accounts/` OAuth routes.
+Do **not** add database `SocialApp` rows or `SOCIALACCOUNT_PROVIDERS` as a second
+credential source. Credentials stay in environment-driven settings.
+
+Authkits owns verified-email policy and the MFA/session/audit handoff. Silent local
+account linking by matching email is disabled. Sign in to the existing account and
+use `/auth/security/social/` to connect a provider deliberately.
+
+This host sets allauth's `SOCIALACCOUNT_ONLY=True` to disable its independent local
+password/reset/email flows; Authkits still supports local password authentication.
+Legacy allauth login/logout/connections entry points are routed to Authkits.
+The allauth safety check in this mode keeps the last connected social provider;
+connect a second provider before demonstrating disconnect. Do not remove that guard
+or enable alternate account flows just to bypass a disconnect refusal.
+
+Connection changes use fresh password proof or a connected provider with supported
+native reauthentication, followed by Authkits MFA when required. Google supplies
+that native proof; use the package's **Verify with Google** action in provider
+management. GitHub does not support equivalent forced fresh proof in this package.
+OAuth is never treated as recent password assurance. Social-only accounts need a
+usable local password (set through Authkits recovery) for password-primary lifecycle
+operations such as account deletion. Headless social additionally requires the API
+flag and uses the same provider configuration.
+
+## Customer-style smoke flow
+
+Use disposable local accounts. Verification/reset/email-MFA codes appear in the
+local console; never use console email or publish its output in production.
+
+1. Sign up, verify email, sign in by username and email, then sign out.
+2. Request a password reset; verify the code and choose a new password.
+3. Enroll email MFA; optionally TOTP. Save recovery codes and complete MFA login.
+4. Open Security Center, then exercise a management action requiring fresh proof.
+5. Sign in in two browsers, inspect sessions, revoke the other session, and confirm
+   that browser is rejected on its next request.
+6. Change password through `/auth/security/password/`; confirm other access is
+   revoked. Delete a disposable account only after final `DELETE` confirmation.
+7. With social enabled, test both provider callbacks, deliberate connect/disconnect,
+   Google reauthentication and OAuth-to-MFA handoff. See the release guide's exact
+   manual provider sequence.
+8. With API enabled, follow the client examples for session and cookie-free bearer
+   login, MFA, rotation/revocation, step-up, inventories and lifecycle changes.
+9. Exercise trusted devices separately over HTTPS; inspect, use, rotate and revoke.
+10. Perform real activation, offline verification, outage and downloaded-wheel checks
+    using [the release smoke guide](docs/RELEASE_SMOKES.md).
+
+Abuse controls also apply to successful security operations. Use separate test
+accounts/flows and respect retry windows if repeated manual actions exhaust budgets.
+Do not weaken package checks to make a smoke pass.
+
+## Licensed activation
+
+Keep `AUTHKITS_ENTITLEMENT_FILE` blank for the initial development boot. Configure a
+real license key only in the untracked environment, then run:
+
+```bash
+python manage.py authkits_activate --output .authkits/entitlement.jws
+```
+
+Only after successful activation, set:
+
+```dotenv
 AUTHKITS_ENTITLEMENT_FILE=.authkits/entitlement.jws
-AUTHKITS_TRUSTED_DEVICES=0
 ```
 
-`AUTHKITS_TOTP_KEYS` may contain multiple comma-separated Fernet keys during key
-rotation, newest first.
+Restart and run `python manage.py check`. A configured missing/invalid file correctly
+fails with `authkits.E006`; do not silence it. The package verifies the JWS locally
+before atomic persistence. `.authkits/` is ignored. A valid local entitlement is
+used without normal authentication depending on Authkits.com.
 
-## Licensed activation smoke
+This setup is not evidence of completed production activation. Key rollout, real
+activation/download authorization, outage verification, release version and commercial
+terms remain operator gates in [RELEASE_SMOKES.md](docs/RELEASE_SMOKES.md).
 
-The current Authkits Django wheel ships the production entitlement verification key,
-so this reference app can exercise the real customer activation path without storing
-private package or signing material in Git.
+## Validation and CI
 
-Put a real Django Authentication license in the untracked `.env`:
+Public CI intentionally has **no proprietary wheel**:
 
-```env
-AUTHKITS_LICENSE_KEY=AK_PRO_...
-AUTHKITS_ENTITLEMENT_FILE=.authkits/entitlement.jws
+```bash
+python -m unittest discover -s host_tests -v
+python -m compileall -q config host_tests scripts manage.py
 ```
 
-Then activate explicitly:
+It checks base defaults, opt-in flags, missing-extra failures, credential validation,
+secret-safe errors, and host configuration without importing Authkits.
 
-```powershell
-python manage.py authkits_activate
-```
+With your installed wheel and desired `.env` profile:
 
-A successful activation verifies the signed entitlement locally before atomically
-writing `.authkits/entitlement.jws`. That directory is gitignored.
-
-After activation, verify that the host can operate from local entitlement state:
-
-```powershell
+```bash
 python manage.py check
-python manage.py authkits_check --security
+python manage.py test config -v 2
 ```
 
-For the outage smoke, keep the entitlement file in place, make Authkits.com
-unreachable, and repeat the local checks plus normal signup/login/MFA flows. Ordinary
-Authkits runtime must not require licensing network access after activation.
+The suite uses real package routes, normal password hashing and enforced CSRF. API
+tests explicitly skip when disabled; combined OAuth launch tests require both flags.
+Provider credentials in automated tests are inert fixtures: no real callback is
+claimed. The package's private test suite remains responsible for exhaustive security
+and provider-protocol coverage.
 
-Never commit the real license key or the signed entitlement token.
+Run customer-style clean installs outside any source checkout:
 
-## Validation
-
-With the licensed wheel installed:
-
-```powershell
-python manage.py check
-python manage.py test config
+```bash
+python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl"
+# Or select a lane / supported Django line:
+python scripts/smoke_wheel.py "/absolute/path/authkits_django-<version>-py3-none-any.whl" --profile api-social --django 5.2
 ```
 
-The integration suite uses normal password hashing, CSRF enforcement, locmem email
-and public Authkits routes. It exercises signup, verification, login, MFA, session
-security and logout through the installed package rather than importing private source.
-
-Public GitHub Actions cannot download the proprietary Authkits wheel. Public CI
-therefore validates the host dependencies, environment/settings contract and Python
-syntax. Full package integration testing happens locally and in the private package CI.
+The default runs fresh base, `[mfa]`, `[api]`, `[social]`, and `[api,social]` virtual
+environments. It copies only host files, installs the supplied wheel, verifies its
+installed location, migrates, checks, and tests. Base/MFA lanes assert allauth and DRF
+are absent. Local secrets/entitlements are not copied; this runner **does not**
+perform real activation or live OAuth. Use it in local/private CI, never expose a
+licensed wheel to public PR jobs or upload it as a public artifact.
 
 ## Production boundaries
 
-This is a development/reference host, not a deployment template.
-
-A production application must supply its own production secrets, HTTPS, secure cookie
-settings, email provider, database, static-file deployment, proxy configuration,
-monitoring and retention policy. Authkits does not silently own those host concerns.
+A real deployment must supply production secrets, HTTPS/cookie policy, trusted proxy
+configuration, email delivery, database/backups, static hosting, application
+permissions, telemetry redaction and retention/maintenance. Django admin remains a
+host-owned login path; this example does not claim it is protected by Authkits MFA.
+Do not expose admin or other alternate authentication without reviewing their policy.
+Authkits does not make these deployment/security decisions for the host.
