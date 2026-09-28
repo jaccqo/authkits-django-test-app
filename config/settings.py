@@ -59,6 +59,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "authkits.security.middleware.SessionSecurityMiddleware",
+    "authkits.admin.AdminSecurityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -144,6 +145,17 @@ AUTHKITS = {
         "SESSION_TRACKING": env_bool("AUTHKITS_SESSION_TRACKING", True),
         "TRUSTED_DEVICES": env_bool("AUTHKITS_TRUSTED_DEVICES", False),
         "DEVICE_TTL": int(os.environ.get("AUTHKITS_DEVICE_TTL", "2592000")),
+    },
+    "ADMIN": {
+        "ENABLED": env_bool("AUTHKITS_ADMIN_ENABLED", True),
+        "REQUIRE_MFA": env_bool("AUTHKITS_ADMIN_REQUIRE_MFA", True),
+        "REQUIRE_VERIFIED_EMAIL": env_bool(
+            "AUTHKITS_ADMIN_REQUIRE_VERIFIED_EMAIL",
+            True,
+        ),
+        "FRESH_MFA_TTL": int(
+            os.environ.get("AUTHKITS_ADMIN_FRESH_MFA_TTL", "300")
+        ),
     },
     "MFA": {
         "ENFORCED": env_bool("AUTHKITS_MFA_ENFORCED", False),
